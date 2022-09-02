@@ -6,6 +6,7 @@ const Joi = require("joi");
 const { secret } = require('../config.json');
 const User = require("../models/User/User");
 const userService = require('../models/User/UserService');
+const Post = require('../models/Post/Post');
 
 require("dotenv").config();
 
@@ -14,8 +15,11 @@ api.get('/',(req,res)=>{
   })
 
 api.post('/register', register);
-api.get('/login', checkUser, checkPassword, authenticate);
+api.post('/login', checkUser, checkPassword, authenticate);
 api.get('/getUser', getUser);
+api.post('/posts/new', checkJWT, newPost);
+api.get('/posts', checkJWT, getPosts);
+api.get('/posts/:id', checkJWT, getPost);
 
 
 api.use((req, res) => {
@@ -25,6 +29,32 @@ api.use((req, res) => {
   
 module.exports = api;
 
+async function newPost(req, res) {
+  const schema = Joi.object({ title : Joi.string().required(), text : Joi.string().required(), attachments: Joi.array()});
+  const { error } = schema.validate(req.body);
+  if (error) {
+    return res.status(400).json(error);
+  }
+  let token = req.headers.authorization.split(" ")[1];    
+  const tokenData = jwt.verify(token, secret);
+  let tokenUser = await User.findOne({_id : tokenData._id}).exec();  
+  const post = new Post();
+
+  post.title = req.body.title;
+  post.text = req.body.text;
+  post.attachments = req.body.attachments;
+  post.username = tokenUser.username;
+
+  await post.save(function(err,result){
+    if (err){
+        res.status(400).json(err)
+    }
+    else{
+        res.status(200).json(result);
+    }
+});
+}
+
 async function getUser(req,res) {
     let token = req.headers.authorization.split(" ")[1];    
     const tokenData = jwt.verify(token, secret);
@@ -33,9 +63,29 @@ async function getUser(req,res) {
       res.status(401).json("Unauthorized.");
     } else{
       tokenUser = userService.basicDetails(tokenUser);
-        res.status(200).json(tokenUser);
+      res.status(200).json(tokenUser);
     }
 }
+
+async function getPosts(req,res){
+  Post.find().exec(function (error, postList) {
+    if (error) {
+      res.status(400).json(error);
+    } else {
+        res.status(200).json(postList);
+      }
+  })
+};
+
+async function getPost(req,res){
+  Post.findById(req.params.id).exec(function (error, post) {
+    if (error) {
+      res.status(400).json(error);
+    } else {
+        res.status(200).json(post);
+      }
+  })
+};
 
 async function register(req, res) {
   const schema = Joi.object({ email : Joi.string().email().required(), username : Joi.string().required(), password : Joi.string().required() });
@@ -80,7 +130,6 @@ async function checkUser(req,res,next){
         res.status(400).json(error);
       } else if (!user) {
         res.status(404).json("User does not exist.");
-        console.log("User does not exist.");
       } else {
           next();
         }
@@ -112,9 +161,24 @@ function authenticate(req, res) {
     if (error | !user) {
       res.status(400).json(error);
     } else {
-        console.log(user);
         let jwt = userService.generateJwtToken(user);
-        res.status(200).json(jwt);
+        res.status(200).json({token:jwt});
     }
   })
+}
+
+async function checkJWT(req,res,next){
+  try{
+    let token = req.headers.authorization.split(" ")[1];  
+    const tokenData = jwt.verify(token, secret);
+    let tokenUser = await User.findOne({_id : tokenData._id}).exec();
+    if(!tokenUser){
+      res.status(401).json("Unauthorized.");
+    } else{
+      next();
+    }
+  }
+  catch{
+    res.status(401).end("Error occured.");
+  }
 }
