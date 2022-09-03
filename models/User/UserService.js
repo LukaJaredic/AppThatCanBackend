@@ -16,10 +16,10 @@ async function getUser(_id) {
 }
 
 function generateJwtToken(user) {
-    return jwt.sign({ sub: user._id, _id: user._id }, secret, { expiresIn: '10m' });
+    return jwt.sign({ sub: user._id, _id: user._id }, secret, { expiresIn: '10d' });
 }
 
 function basicDetails(user) {
-    const { id, username, email } = user;
-    return { id, username, email };
+    const { id, username, email, posts } = user;
+    return { id, username, email, posts };
 }

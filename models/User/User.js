@@ -17,7 +17,8 @@ var userSchema = new Schema({
     password: {
         type: String,
         required: true
-    }
+    },
+    posts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
 });
 
 userSchema.methods.comparePassword = function(password, callback) {

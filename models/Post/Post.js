@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 var Schema = mongoose.Schema;
 
-// attachments
 const postSchema = new Schema({
   title: { 
     type: String,
@@ -12,16 +11,14 @@ const postSchema = new Schema({
     type: String, 
     required: true 
   },
-  username: { 
-    type: String, 
-    required: true 
-  },
   uploaded: {
     type: Date,
     default: Date.now(),
     required: true
   },
-  attachments:[String]
+  attachments:[String],
+  author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  comments: [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
 });
 
 module.exports = mongoose.model('Post', postSchema);
