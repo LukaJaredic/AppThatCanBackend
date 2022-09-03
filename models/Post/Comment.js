@@ -12,6 +12,10 @@ const commentSchema = new Schema({
     default: Date.now(),
     required: true
   },
+  isSolution: {
+    type: Boolean,
+    required: true
+  },
   author: { type: Schema.Types.ObjectId, ref: 'User', required: true }
 });
 

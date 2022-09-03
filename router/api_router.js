@@ -23,6 +23,9 @@ api.get('/posts/:id', getPost);
 api.post('/posts/:postId/comment', checkJWT, comment);
 api.post('/posts/editPost/:id', checkJWT, editPost);
 api.post('/posts/editComment/:id', checkJWT, editComment);
+api.post('/posts/:id/workingOnSolution', checkJWT, workingOnSolution);
+api.post('/posts/:id/quitWorkingOnSolution', checkJWT, quitWorkingOnSolution);
+
 
 api.use((req, res) => {
     res.statusCode = 404;
@@ -107,7 +110,7 @@ async function newPost(req, res) {
   post.text = req.body.text;
   post.attachments = req.body.attachments;
   post.author = tokenUser._id;
-
+  post.workingOnSolution = [];
 
   await post.save(async function(err,result){
     if (err){
@@ -127,7 +130,7 @@ async function newPost(req, res) {
 }
 
 async function getPosts(req,res){
-  Post.find().populate('comments').exec(function (error, postList) {
+  Post.find().populate('comments').populate('author','username').populate('workingOnSolution','username').exec(function (error, postList) {
     if (error) {
       res.status(400).json(error);
     } else {
@@ -137,17 +140,20 @@ async function getPosts(req,res){
 };
 
 async function getPost(req,res){
-  Post.findById(req.params.id).populate('comments').exec(function (error, post) {
+  Post.findOneAndUpdate({_id : req.params.id},{$inc : {viewNumber : 1}}).exec();
+
+  Post.findById(req.params.id).populate('comments').populate('author','username').populate('workingOnSolution','username').exec(function (error, post) {
     if (error) {
       res.status(400).json(error);
     } else {
         res.status(200).json(post);
+
       }
   })
 };
 
 async function comment(req,res){
-  const schema = Joi.object({ text : Joi.string().required() });
+  const schema = Joi.object({ text : Joi.string().required(), isSolution : Joi.boolean().required() });
   const { error } = schema.validate(req.body);
   if (error) {
     return res.status(400).json(error);
@@ -159,6 +165,7 @@ async function comment(req,res){
   const comment = new Comment();
   comment.text = req.body.text;
   comment.author = tokenUser._id;
+  comment.isSolution = req.body.isSolution;
 
   await comment.save(async function(err,result){
     if (err){
@@ -227,7 +234,33 @@ async function editComment(req,res){
   }
 }
 
+async function workingOnSolution(req,res){
+  let token = req.headers.authorization.split(" ")[1];    
+  const tokenData = jwt.verify(token, secret);
+  let tokenUser = await User.findOne({_id : tokenData._id}).exec();
 
+  Post.findOneAndUpdate({_id : req.params.id},{$addToSet: {workingOnSolution: tokenUser}}).exec(async function(err,result){
+    if(err){
+      res.status(400).json(err);
+    } else {
+      res.status(200).json(result);
+    }
+  });
+}
+
+async function quitWorkingOnSolution(req,res){
+  let token = req.headers.authorization.split(" ")[1];    
+  const tokenData = jwt.verify(token, secret);
+  let tokenUser = await User.findOne({_id : tokenData._id}).exec();
+
+  Post.findOneAndUpdate({_id : req.params.id},{$pull: {workingOnSolution: tokenUser._id}}).exec(async function(err,result){
+    if(err){
+      res.status(400).json(err);
+    } else {
+      res.status(200).json(result);
+    }
+  });
+}
 
 
 //checks if user exists
