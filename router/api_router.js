@@ -8,6 +8,7 @@ const User = require("../models/User/User");
 const userService = require('../models/User/UserService');
 const Post = require('../models/Post/Post');
 const Comment = require('../models/Post/Comment');
+const imgUploadController = require('../utils/imgUploadController');
 
 api.get('/',(req,res)=>{
     res.end('test123');
@@ -17,7 +18,7 @@ api.post('/register', register);
 api.post('/login', checkUser, checkPassword, authenticate);
 api.get('/getUser', getUser);
 api.get('/getUser/:id', getUserByID);
-api.post('/posts/new', checkJWT, newPost);
+api.post('/posts/new', checkJWT, imgUploadController.uploadImages, imgUploadController.resizeImages, newPost);
 api.get('/posts', getPosts);
 api.get('/posts/:id', getPost);
 api.post('/posts/:postId/comment', checkJWT, comment);
@@ -25,7 +26,6 @@ api.post('/posts/editPost/:id', checkJWT, editPost);
 api.post('/posts/editComment/:id', checkJWT, editComment);
 api.post('/posts/:id/workingOnSolution', checkJWT, workingOnSolution);
 api.post('/posts/:id/quitWorkingOnSolution', checkJWT, quitWorkingOnSolution);
-
 
 api.use((req, res) => {
     res.statusCode = 404;
@@ -261,7 +261,6 @@ async function quitWorkingOnSolution(req,res){
     }
   });
 }
-
 
 //checks if user exists
 async function checkUser(req,res,next){
