@@ -12,7 +12,7 @@ const upload = multer({
   storage: multerStorage,
   fileFilter: multerFilter
 });
-const uploadFiles = upload.array("attachments", 10);
+const uploadFiles = upload.array("attachments[]", 10);
 const uploadImages = (req, res, next) => {
   uploadFiles(req, res, err => {
     if (err instanceof multer.MulterError) {

@@ -24,7 +24,7 @@ const postSchema = new Schema({
   attachments:[String],
   author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   comments: [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
-  workingOnSolution: [{ type: Schema.Types.ObjectId, ref: 'User' }]
+  workingOnSolution: [{ type: Schema.Types.ObjectId, ref: 'WorkingOnIt' }]
 });
 
 module.exports = mongoose.model('Post', postSchema);

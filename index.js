@@ -25,7 +25,7 @@ app.use(bodyParser.json());
 
 app.use(cors({ origin: (origin, callback) => callback(null, true), credentials: true }));
 
-var staticPath = path.resolve(__dirname,"static");
+var staticPath = path.resolve(__dirname,"assets");
 
 app.use(express.static(staticPath));
 

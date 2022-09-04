@@ -9,6 +9,7 @@ const userService = require('../models/User/UserService');
 const Post = require('../models/Post/Post');
 const Comment = require('../models/Post/Comment');
 const imgUploadController = require('../utils/imgUploadController');
+const WorkingOnIt = require('../models/Post/WorkingOnIt');
 
 api.get('/',(req,res)=>{
     res.end('test123');
@@ -24,8 +25,8 @@ api.get('/posts/:id', getPost);
 api.post('/posts/:postId/comment', checkJWT, comment);
 api.post('/posts/editPost/:id', checkJWT, editPost);
 api.post('/posts/editComment/:id', checkJWT, editComment);
-api.post('/posts/:id/workingOnSolution', checkJWT, workingOnSolution);
-api.post('/posts/:id/quitWorkingOnSolution', checkJWT, quitWorkingOnSolution);
+api.post('/posts/:id/workingOnSolution', checkJWT, isWorkingOnIt, workingOnSolution);
+api.post('/posts/:id/addReport', checkJWT, addReport);
 
 api.use((req, res) => {
     res.statusCode = 404;
@@ -110,6 +111,7 @@ async function newPost(req, res) {
   post.text = req.body.text;
   post.attachments = req.body.attachments;
   post.author = tokenUser._id;
+  post.uploaded = Date.now();
   post.workingOnSolution = [];
 
   await post.save(async function(err,result){
@@ -122,7 +124,7 @@ async function newPost(req, res) {
           await Post.findOneAndDelete({_id : result._id}).exec();
           res.status(400).json(err2);
         } else {
-          res.status(200).json(result2);
+          res.status(200).json("New post added.");
         }
       });
     }
@@ -130,7 +132,10 @@ async function newPost(req, res) {
 }
 
 async function getPosts(req,res){
-  Post.find().populate('comments').populate('author','username').populate('workingOnSolution','username').exec(function (error, postList) {
+  Post.find().populate('comments')
+      .populate('author','username')
+      .populate({path: 'workingOnSolution', populate: { path: 'author', select:'username' }})
+      .exec(function (error, postList) {
     if (error) {
       res.status(400).json(error);
     } else {
@@ -142,7 +147,11 @@ async function getPosts(req,res){
 async function getPost(req,res){
   Post.findOneAndUpdate({_id : req.params.id},{$inc : {viewNumber : 1}}).exec();
 
-  Post.findById(req.params.id).populate('comments').populate('author','username').populate('workingOnSolution','username').exec(function (error, post) {
+  Post.findById(req.params.id)
+      .populate({path: 'comments', populate: { path: 'author', select:'username' }})
+      .populate('author','username')
+      .populate({path: 'workingOnSolution', populate: { path: 'author', select:'username' }})
+      .exec(function (error, post) {
     if (error) {
       res.status(400).json(error);
     } else {
@@ -166,6 +175,7 @@ async function comment(req,res){
   comment.text = req.body.text;
   comment.author = tokenUser._id;
   comment.isSolution = req.body.isSolution;
+  comment.uploaded = Date.now();
 
   await comment.save(async function(err,result){
     if (err){
@@ -194,7 +204,7 @@ async function editPost(req,res){
   let token = req.headers.authorization.split(" ")[1];    
   const tokenData = jwt.verify(token, secret);
   let tokenUser = await User.findOne({_id : tokenData._id}).exec();
-  
+  console.log(req.body);
   if(!tokenUser.posts.includes(req.params.id)){
     res.status(403).json("Can't edit other user's posts.")
   } else{
@@ -208,7 +218,7 @@ async function editPost(req,res){
   }
 }
 
-async function editComment(req,res){
+async function editComment(req,res,next){
   const schema = Joi.object({ newText : Joi.string().required() });
   const { error } = schema.validate(req.body);
   if (error) {
@@ -239,25 +249,78 @@ async function workingOnSolution(req,res){
   const tokenData = jwt.verify(token, secret);
   let tokenUser = await User.findOne({_id : tokenData._id}).exec();
 
-  Post.findOneAndUpdate({_id : req.params.id},{$addToSet: {workingOnSolution: tokenUser}}).exec(async function(err,result){
-    if(err){
-      res.status(400).json(err);
-    } else {
-      res.status(200).json(result);
-    }
-  });
+    let work = new WorkingOnIt(req,res);
+    work.author = tokenUser;
+    work.finishEstimation = req.body.finishEstimation;
+    work.reports = [req.body.text];
+  
+    work.save(async function (err, result) {
+      if (err) {
+        res.status(400).json(err);
+      } else {
+        await Post.findOneAndUpdate({ _id: req.params.id }, { $addToSet: { workingOnSolution: work } }).exec(async function (err2, result2) {
+          if (err) {
+            res.status(400).json(err2);
+          } else {
+            await WorkingOnIt.findOneAndDelete({ _id: req.params.id }).exec();
+            res.status(200).json(result2);
+          }
+        });
+      }
+    });
 }
 
-async function quitWorkingOnSolution(req,res){
+async function addReport(req,res){
   let token = req.headers.authorization.split(" ")[1];    
   const tokenData = jwt.verify(token, secret);
   let tokenUser = await User.findOne({_id : tokenData._id}).exec();
 
-  Post.findOneAndUpdate({_id : req.params.id},{$pull: {workingOnSolution: tokenUser._id}}).exec(async function(err,result){
-    if(err){
-      res.status(400).json(err);
+  let workingOnIt = false;
+
+  await Post.findById(req.params.id).populate('workingOnSolution').exec(async function (err, result) {
+    if (err | result==null) {
+      res.status(400).json("Post does not exist");
     } else {
-      res.status(200).json(result);
+        for (let i = 0; i < result.workingOnSolution.length; i++) {
+          if (result.workingOnSolution[i].author+"" == tokenUser._id+"") {
+            workingOnIt = true;
+            await WorkingOnIt.findOneAndUpdate({_id : result.workingOnSolution[i]._id},{$push: {reports: req.body.text}, $set : {finishEstimation: req.body.updatedFinishEstimation}}).exec(async function(err2,result2){
+              if(err2 | result2==null){
+                res.status(400).json("Error occured");
+              } else {
+                res.status(200).json(result2);
+              }
+            })
+          }
+        }
+        if(!workingOnIt){
+          res.status(400).json("User is not working on this problem.");
+        }
+      }
+    });
+}
+
+async function isWorkingOnIt(req,res,next){
+  let token = req.headers.authorization.split(" ")[1];    
+  const tokenData = jwt.verify(token, secret);
+  let tokenUser = await User.findOne({_id : tokenData._id}).exec();
+
+  let error = false;
+
+  await Post.findById(req.params.id).populate('workingOnSolution').exec(async function (err, result) {
+    if (err | result==null) {
+      res.status(400).json("Post does not exist");
+    } else {
+      for (let i = 0; i < result.workingOnSolution.length; i++) {
+        if (result.workingOnSolution[i].author + "" == tokenUser._id+"") {
+          error = true;
+        }
+      }
+      if(error){
+        res.status(400).json("User is already working on this problem.");
+      } else { 
+        next();
+      }
     }
   });
 }
