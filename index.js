@@ -3,7 +3,7 @@ const mongoose = require('mongoose')
 const http = require('http')
 const path = require('path')
 const app = express()
-const port = 3000
+const port = process.env.PORT || 80
 var apiRouter = require('./router/api_router')
 const bodyParser = require('body-parser')
 
