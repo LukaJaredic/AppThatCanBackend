@@ -20,6 +20,6 @@ function generateJwtToken(user) {
 }
 
 function basicDetails(user) {
-    const { id, username, email, posts } = user;
-    return { id, username, email, posts };
+    const { id, username, email, posts, work } = user;
+    return { id, username, email, posts, work };
 }

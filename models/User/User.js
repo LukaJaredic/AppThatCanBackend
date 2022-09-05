@@ -19,7 +19,8 @@ var userSchema = new Schema({
         required: true
     },
     posts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
-});
+    work: [{ type: Schema.Types.ObjectId, ref: 'WorkingOnIt' }]
+  });
 
 userSchema.methods.comparePassword = function(password, callback) {
     bcrypt.compare(password, this.password, function(error, isMatch) {

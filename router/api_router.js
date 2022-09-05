@@ -74,7 +74,7 @@ async function register(req, res) {
 async function getUser(req,res) {
   let token = req.headers.authorization.split(" ")[1];    
   const tokenData = jwt.verify(token, secret);
-  let tokenUser = await User.findOne({_id : tokenData._id}).populate('posts').exec();
+  let tokenUser = await User.findOne({_id : tokenData._id}).populate('posts').populate('work').exec();
   
     if(!tokenUser){
     res.status(401).json("Unauthorized.");
@@ -85,8 +85,7 @@ async function getUser(req,res) {
 }
 
 async function getUserByID(req,res) {
-  
-  let user = await User.findOne({_id : req.params.id}).populate('posts').exec();
+  let user = await User.findOne({_id : req.params.id}).populate('posts').populate('work').exec();
   if(!user){
     res.status(401).json("Unauthorized.");
   } else{
@@ -253,17 +252,25 @@ async function workingOnSolution(req,res){
     work.author = tokenUser;
     work.finishEstimation = req.body.finishEstimation;
     work.reports = [req.body.text];
-  
+
     work.save(async function (err, result) {
-      if (err) {
+      if (err | result==null) {
         res.status(400).json(err);
       } else {
-        await Post.findOneAndUpdate({ _id: req.params.id }, { $addToSet: { workingOnSolution: work } }).exec(async function (err2, result2) {
-          if (err) {
+        await Post.findOneAndUpdate({ _id: req.params.id+"" }, { $addToSet: { workingOnSolution: work } }).exec(async function (err2, result2) {
+          if (err | result2==null) {
+            await WorkingOnIt.findOneAndDelete({ _id: work.id }).exec();
             res.status(400).json(err2);
           } else {
-            await WorkingOnIt.findOneAndDelete({ _id: req.params.id }).exec();
-            res.status(200).json(result2);
+            await User.findOneAndUpdate({ _id: tokenUser._id }, { $addToSet: { work: work } }).exec(async function (err3, result3) {
+              if(err | result3==null){
+                await Post.findOneAndUpdate({ _id: req.params.id+"" }, { $pull: { workingOnSolution: work } }).exec();
+                await WorkingOnIt.findOneAndDelete({ _id: work.id }).exec();
+                res.status(400).json(err3);
+              } else {
+                res.status(200).json(result3);
+              }
+            });
           }
         });
       }
