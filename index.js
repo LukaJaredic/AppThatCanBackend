@@ -1,36 +1,39 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const http = require("http");
-const path = require("path");
-const app = express();
-const port = 3000;
-var apiRouter = require("./router/api_router");
-const bodyParser = require("body-parser");
+const express = require('express')
+const mongoose = require('mongoose')
+const http = require('http')
+const path = require('path')
+const app = express()
+const port = 3000
+var apiRouter = require('./router/api_router')
+const bodyParser = require('body-parser')
 
-const cors = require("cors");
+const cors = require('cors')
 
-const mongodb_database = "mongodb://localhost:27017/AppThatCan";
-mongoose.connect(mongodb_database, { useNewUrlParser: true });
+mongoose.connect(
+    'mongodb+srv://najluigi:skembe31@cluster0.v3ptohh.mongodb.net/AppThatCan?retryWrites=true&w=majority',
+    {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    }
+)
 
-mongoose.connection.on("connected", () => {
-  console.log("Connected to database " + mongodb_database);
-});
+const db = mongoose.connection
+db.on('error', console.error.bind(console, 'connection error: '))
+db.once('open', function () {
+    console.log('Connected successfully')
+})
 
-mongoose.connection.on("error", (err) => {
-  console.log("Database error: " + err);
-});
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(cors({ origin: (origin, callback) => callback(null, true), credentials: true }))
 
-app.use(cors({ origin: (origin, callback) => callback(null, true), credentials: true }));
+var staticPath = path.resolve(__dirname, 'assets')
 
-var staticPath = path.resolve(__dirname, "assets");
+app.use(express.static(staticPath))
 
-app.use(express.static(staticPath));
-
-app.use("/api", apiRouter);
+app.use('/api', apiRouter)
 
 http.createServer(app).listen(port, function () {
-  console.log(`Example app listening at http://localhost:${port}`);
-});
+    console.log(`Example app listening at http://localhost:${port}`)
+})
